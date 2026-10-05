@@ -1,0 +1,45 @@
+[project]
+name = "slate-detector"
+version = "0.1.0"
+description = "Binary classifier: is a FishSense dive slate anywhere in this frame?"
+readme = "README.md"
+authors = [
+    { name = "Christopher L. Crutchfield", email = "ccrutchf@ucsd.edu" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy>=2",
+    "pillow>=10",
+    "rawpy>=0.27",
+]
+
+[project.optional-dependencies]
+train = [
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "scikit-learn>=1.5",
+]
+render = [
+    "fishsense-core==4.1.0",  # cp313 wheel only (see tool.uv.sources)
+    "opencv-python-headless>=4.10",
+]
+
+[project.scripts]
+slate-detector = "slate_detector.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "data: needs the restored DB container and the NAS",
+]
+addopts = "-m 'not data'"
+
+[tool.uv.sources]
+fishsense-core = { url = "https://github.com/UCSD-E4E/fishsense-core/releases/download/fishsense-core-v4.1.0/fishsense_core-4.1.0-cp313-cp313-manylinux_2_34_x86_64.whl" }
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"

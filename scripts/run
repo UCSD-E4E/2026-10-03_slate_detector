@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Run slate-detector with the NixOS bits torch needs, under a memory ceiling.
+#   scripts/run cv
+#   MEMORY_MAX=16G scripts/run train
+set -euo pipefail
+cd "$(dirname "$0")/.."
+envs=(-u VIRTUAL_ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True PYTHONUNBUFFERED=1)
+[ -d /run/opengl-driver/lib ] && envs+=(LD_LIBRARY_PATH="/run/opengl-driver/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}")
+# uv's standalone Python doesn't find the NixOS CA bundle (pretrained-weight downloads fail).
+[ -f /etc/ssl/certs/ca-certificates.crt ] && envs+=(SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt)
+cmd=(env "${envs[@]}" uv run --extra train --extra render slate-detector "$@")
+if systemd-run --user --scope --quiet true 2>/dev/null; then
+  exec systemd-run --user --scope --quiet -p MemoryMax="${MEMORY_MAX:-24G}" -p MemorySwapMax=2G "${cmd[@]}"
+fi
+exec "${cmd[@]}"
