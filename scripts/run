@@ -8,7 +8,7 @@ envs=(-u VIRTUAL_ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True PYTHONUNBU
 [ -d /run/opengl-driver/lib ] && envs+=(LD_LIBRARY_PATH="/run/opengl-driver/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}")
 # uv's standalone Python doesn't find the NixOS CA bundle (pretrained-weight downloads fail).
 [ -f /etc/ssl/certs/ca-certificates.crt ] && envs+=(SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt)
-cmd=(env "${envs[@]}" uv run --extra train --extra render slate-detector "$@")
+cmd=(env "${envs[@]}" uv run --extra train --extra render --extra masks --extra sam3 slate-detector "$@")
 if systemd-run --user --scope --quiet true 2>/dev/null; then
   exec systemd-run --user --scope --quiet -p MemoryMax="${MEMORY_MAX:-24G}" -p MemorySwapMax=2G "${cmd[@]}"
 fi

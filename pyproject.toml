@@ -23,6 +23,28 @@ render = [
     "fishsense-core==4.1.0",  # cp313 wheel only (see tool.uv.sources)
     "opencv-python-headless>=4.10",
 ]
+masks = [
+    "opencv-python-headless>=4.10",
+    "pymupdf>=1.24",
+]
+sam = [
+    "ultralytics>=8.3",
+]
+
+# SAM 3.1 text-prompted masks, pinned to the commit fishsense-lite and fishsense-detector use.
+sam3 = [
+    "torch>=2.4",
+    "sam3 @ git+https://github.com/facebookresearch/sam3.git@8e451d5eb43c817b64ae7577fb7b9ae223db88a9",
+    "fishsense-core==4.1.0",
+    "einops>=0.8.0",
+    "psutil>=6.0.0",
+    "setuptools>=80.9.0,<82",  # sam3 imports pkg_resources, removed in 82
+    "pycocotools>=2.0.8",  # imported by sam3 but not declared
+]
+ls = [
+    "boto3>=1.34",
+    "label-studio-sdk>=2.0.1",
+]
 
 [project.scripts]
 slate-detector = "slate_detector.cli:main"
@@ -36,6 +58,17 @@ markers = [
     "data: needs the restored DB container and the NAS",
 ]
 addopts = "-m 'not data'"
+
+[tool.uv]
+# ultralytics asks for the GUI build of OpenCV, which needs X11 libraries;
+# opencv-python-headless provides the same cv2 (same fix as fishsense-detector).
+override-dependencies = [
+    "opencv-python; sys_platform == 'never'",
+    "numpy>=2",  # sam3 pins numpy<2; the rest of the stack needs numpy 2 (as in fishsense-detector)
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv.sources]
 fishsense-core = { url = "https://github.com/UCSD-E4E/fishsense-core/releases/download/fishsense-core-v4.1.0/fishsense_core-4.1.0-cp313-cp313-manylinux_2_34_x86_64.whl" }

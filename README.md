@@ -127,3 +127,67 @@ move. Answers are saved in the browser until you press "Download answers".
 `ingest` writes `labels/manual/<labeller>/<queue_id>.csv`, which the manifest
 uses ahead of the database answers. Only `labels/overrides.csv` takes
 precedence over it. The id → image map is `labels/queues/<queue_id>_manifest.json`.
+
+## Slate masks (SAM 3.1 + review)
+
+```sh
+uv run --extra masks slate-detector quads      # data/masks/quads.json: outlines warped from diveslatelabel points
+FISHSENSE_SAM3_CHECKPOINT=~/Downloads/sam3.1_multiplex.pt scripts/run sam3-masks   # -> data/masks/sam3/{image_id}.npz
+uv run --extra masks slate-detector mask-queue          # -> ~/Downloads/slate-masks-masks_q1/label.html
+uv run --extra masks slate-detector mask-ingest ~/Downloads/slate-masks-masks_q1-answers.json
+```
+
+SAM 3.1 with the text prompt **"white board"** finds the slate board. "slate" and
+"dive slate" return nothing; cscw-fishsense2027 found the same. SAM keeps up
+to 5 candidates per frame, and one is chosen, in this order:
+1. best overlap with the outline from the frame's point label;
+2. the one containing the human laser dot;
+3. the top score.
+
+When nothing is found and an outline exists, SAM is retried on a crop around
+it. SAM is not a presence detector (it also finds checkerboards, the Box
+target and boat decks), so it only runs on frames labelled slate.
+
+The review page shows the chosen candidate: `Y` accept, `N` reject, `C` can't
+tell, `1`–`5` switch candidate, `Z` zoom. `mask-ingest` writes accepted masks
+as polygons plus a fitted 4-corner quad (frame-cache 1600 px coordinates) to
+`labels/masks/<labeller>/<queue_id>.json`.
+
+Outlines warped from the label points alone are not accurate enough to train
+on. The PDF page is smaller than the physical board, and on V-slates all 6
+reference points sit on the V tape, so the corners extrapolate badly.
+
+### Board fit and Label Studio
+
+```sh
+scripts/run rect-fit                       # data/masks/rect.json: rounded-rectangle pose per frame
+uv run --extra masks --extra ls slate-detector ls-push                 # frames -> Garage, project + SAM quads (first time)
+uv run --extra masks --extra ls --extra train slate-detector ls-predict <project> --kind rect   # board-fit outlines as predictions
+uv run --extra masks --extra ls slate-detector ls-pull <project>       # -> labels/masks/<labeller>/ls_project_<id>.json
+```
+
+**Shape.** Every slate is the same 8.5 × 12 in board with rounded corners:
+aspect 0.708, corner radius 3.1% of the width, measured on lightly occluded
+frames of all families.
+
+**Fit (`rectfit.fit_board`).** The board's 3D pose is fitted through the
+camera's known intrinsics so that its outline covers SAM's mask. Area SAM didn't
+see is penalised only lightly, because that's where hands are, so the outline
+completes the edges hands cover. The fit tries every starting quad and corner
+assignment, then picks the fit minimising cost + 0.04·(1 − cos tilt).
+Without that prior, portrait-held boards could fit as 60°-tilted landscape
+ones (cos 60° = 0.708²), and boards with hands on both edges could follow the
+hand outline. `rect_v1.json` and `rect_v2.json` keep the earlier fits.
+
+**Label Studio.** The lab's hosted Label Studio (`app.heartex.com`, workspace
+FishSense) is used the way fishsense-lite does: frames in Garage
+(`s3://labels-fishsense-lite/slate-detector/frames/`) are presigned through a
+source storage, and model output is imported as predictions. Credentials live
+in `~/.config/slate-detector/secrets.env`, outside git. Rule: outline the
+whole board, including parts hidden by hands.
+
+**For laser calibration (apparent size), use √(SAM mask area), not the board
+fit.** Scored against tape with cscw-fishsense2027's e1j scorer: √(SAM area)
+2.8%, board-fit depth at the dot 3.9%, √(fitted outline area) 3.5%.
+`sam3-masks --label-free` chooses candidates by the laser dot and score only,
+with no slate labels.

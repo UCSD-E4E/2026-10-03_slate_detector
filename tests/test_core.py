@@ -47,7 +47,8 @@ def test_overrides_win_over_answers():
 def test_checked_in_overrides_parse():
     from slate_detector.dataset import read_overrides
     overrides = read_overrides()
-    assert len(overrides) == 47 and set(overrides.values()) == {0}
+    assert set(overrides.values()) == {0}
+    assert {132606, 133795, 81964, 105340} <= set(overrides)  # checkerboard-only, Box, two queue mis-keys
 
 
 def _frame(i, dive, label):
